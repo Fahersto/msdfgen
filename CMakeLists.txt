@@ -4,7 +4,7 @@ include(cmake/version.cmake)
 
 option(MSDFGEN_CORE_ONLY "Only build the core library with no dependencies" OFF)
 option(MSDFGEN_BUILD_STANDALONE "Build the msdfgen standalone executable" ON)
-option(MSDFGEN_USE_VCPKG "Use vcpkg package manager to link project dependencies" ON)
+option(MSDFGEN_USE_VCPKG "Use vcpkg package manager to link project dependencies" OFF)
 option(MSDFGEN_USE_OPENMP "Build with OpenMP support for multithreaded code" OFF)
 option(MSDFGEN_USE_CPP11 "Build with C++11 enabled" ON)
 option(MSDFGEN_USE_SKIA "Build with the Skia library" ON)
@@ -92,6 +92,7 @@ file(GLOB_RECURSE MSDFGEN_EXT_SOURCES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} "ext/
 
 # Core library
 add_library(msdfgen-core "${CMAKE_CURRENT_SOURCE_DIR}/msdfgen.h" ${MSDFGEN_CORE_HEADERS} ${MSDFGEN_CORE_SOURCES})
+target_link_libraries(msdfgen-core PRIVATE png_static)
 add_library(msdfgen::msdfgen-core ALIAS msdfgen-core)
 set_target_properties(msdfgen-core PROPERTIES PUBLIC_HEADER "${MSDFGEN_CORE_HEADERS}")
 set_property(TARGET msdfgen-core PROPERTY MSVC_RUNTIME_LIBRARY "${MSDFGEN_MSVC_RUNTIME}")
@@ -129,18 +130,19 @@ endif()
 
 # Extensions library
 if(NOT MSDFGEN_CORE_ONLY)
-    if(NOT TARGET Freetype::Freetype)
+    if(NOT TARGET freetype)
         find_package(Freetype REQUIRED)
     endif()
     if(NOT MSDFGEN_DISABLE_SVG AND NOT TARGET tinyxml2::tinyxml2)
         find_package(tinyxml2 REQUIRED)
     endif()
-    if(NOT MSDFGEN_DISABLE_PNG AND NOT TARGET PNG::PNG)
+    if(NOT MSDFGEN_DISABLE_PNG AND NOT TARGET png_static)
         find_package(PNG REQUIRED)
     endif()
 
     add_library(msdfgen-ext "${CMAKE_CURRENT_SOURCE_DIR}/msdfgen-ext.h" ${MSDFGEN_EXT_HEADERS} ${MSDFGEN_EXT_SOURCES})
     add_library(msdfgen::msdfgen-ext ALIAS msdfgen-ext)
+    target_link_libraries(msdfgen-ext PRIVATE png_static)
     set_target_properties(msdfgen-ext PROPERTIES PUBLIC_HEADER "${MSDFGEN_EXT_HEADERS}")
     set_property(TARGET msdfgen-ext PROPERTY MSVC_RUNTIME_LIBRARY "${MSDFGEN_MSVC_RUNTIME}")
     target_compile_definitions(msdfgen-ext INTERFACE MSDFGEN_EXTENSIONS)
@@ -152,14 +154,14 @@ if(NOT MSDFGEN_CORE_ONLY)
     endif()
     if(NOT MSDFGEN_DISABLE_PNG)
         target_compile_definitions(msdfgen-ext PUBLIC MSDFGEN_USE_LIBPNG)
-        target_link_libraries(msdfgen-ext PRIVATE PNG::PNG)
+        target_link_libraries(msdfgen-ext PRIVATE png_static)
     else()
         target_compile_definitions(msdfgen-ext PUBLIC MSDFGEN_DISABLE_PNG)
     endif()
     if(MSDFGEN_DISABLE_VARIABLE_FONTS)
         target_compile_definitions(msdfgen-ext PUBLIC MSDFGEN_DISABLE_VARIABLE_FONTS)
     endif()
-    target_link_libraries(msdfgen-ext PRIVATE Freetype::Freetype msdfgen::msdfgen-core)
+    target_link_libraries(msdfgen-ext PRIVATE freetype msdfgen::msdfgen-core)
     target_include_directories(msdfgen-ext
         PUBLIC
             $<INSTALL_INTERFACE:include/msdfgen>
@@ -196,9 +198,11 @@ if(NOT MSDFGEN_CORE_ONLY)
 
     add_library(msdfgen-full INTERFACE)
     add_library(msdfgen::msdfgen ALIAS msdfgen-full)
+    target_link_libraries(msdfgen-full INTERFACE png_static)
     target_link_libraries(msdfgen-full INTERFACE msdfgen::msdfgen-core msdfgen::msdfgen-ext)
 else()
     add_library(msdfgen::msdfgen ALIAS msdfgen-core)
+    target_link_libraries(msdfgen::msdfgen INTERFACE png_static)
 endif()
 
 # Standalone executable
